@@ -5,7 +5,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 
-pub async fn client_connection(ws: WebSocket, clients: Clients) {
+pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate::lib::ChatLog) {
     println!("establishing client connection... {:?}", ws);
 
     let (client_ws_sender, mut client_ws_rcv) = ws.split();
@@ -32,20 +32,20 @@ pub async fn client_connection(ws: WebSocket, clients: Clients) {
         let msg = match result {
             Ok(msg) => msg,
             Err(e) => {
-                println!("error receiving message for id {}): {}", uuid.clone(), e);
+                println!("[ERROR] Receiving message for id {}: {}", uuid.clone(), e);
                 break;
             }
         };
 
-        client_msg(&uuid, msg, &clients).await;
+        client_msg(&uuid, msg, &clients, &chat_log).await;
     }
 
     clients.lock().await.remove(&uuid);
     println!("{} disconnected", uuid);
 }
 
-async fn client_msg(client_id: &str, msg: Message, clients: &Clients) {
-    println!("received message from {}: {:?}", client_id, msg);
+async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &crate::lib::ChatLog) {
+    println!("[INCOMING] Received message from {}: {:?}", client_id, msg);
 
     let message = match msg.to_str() {
         Ok(v) => v,
@@ -58,7 +58,6 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients) {
         match locked.get(client_id) {
             Some(v) => {
                 if let Some(sender) = &v.sender {
-                    println!("sending pong");
                     let _ = sender.send(Ok(Message::text("pong")));
                 }
             }
