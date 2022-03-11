@@ -1,7 +1,9 @@
-pub type ChatLog = Vec<ChatMessage>;
+#[macro_use]
+extern crate lazy_static;
 
-#[derive(Debug, Clone)]
-pub struct ChatMessage {
-    content: String,
-    author: String
-}
+pub mod client;
+pub mod error;
+pub mod hub;
+pub mod model;
+pub mod proto;
+pub mod server;
