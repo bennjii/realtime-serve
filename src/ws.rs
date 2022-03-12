@@ -81,10 +81,12 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     }else if message == "query.all" {
         let locked = clients.lock().await;
 
+        let clone_logs = logs.clone();
+
         match locked.get(client_id) {
             Some(v) => {
                 if let Some(sender) = &v.sender {
-                    let _ = sender.send(Ok(Message::text(serde_json::to_string(serde_json::to_vec(&logs.to_vec()).unwrap()).unwrap())));
+                    let _ = sender.send(Ok(Message::text(serde_json::to_string(&clone_logs).unwrap())));
                 }
             }
             None => return,

@@ -11,8 +11,8 @@ type ChatVector = Vec<ChatMessage>;
 pub struct ChatMessage {
     pub content: String,
     pub author: String,
-    created_at: DateTime<Utc>,
-    id: uuid::Uuid
+    pub created_at: DateTime<Utc>,
+    pub id: uuid::Uuid
 }
 
 impl Serialize for ChatMessage {
