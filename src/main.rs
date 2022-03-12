@@ -14,14 +14,13 @@ pub struct Client {
 type Clients = Arc<Mutex<HashMap<String, Client>>>;
 type Result<T> = std::result::Result<T, Rejection>;
 
-
 #[tokio::main]
 async fn main() {
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
 
     println!("[SERVICE] ws_handler::start");
 
-    let chat_log = vec!();
+    let chat_log = Arc::new(Mutex::new(vec!()));
 
     let ws_route = warp::path::end()
         .and(warp::ws())
