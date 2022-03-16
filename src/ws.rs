@@ -48,6 +48,10 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate:
 async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &crate::lib::ChatLog) {
     println!("[INCOMING] Received message from {}: {:?}", client_id, msg);
 
+    // Parse message as a JSON input parameter from stringified input.
+    let json: crate::lib::SetRecieve = serde_json::from_str(&msg.to_str().unwrap()).expect("JSON format INVALID");
+    println!("{:#?}", json);
+
     let message = match msg.to_str() {
         Ok(v) => v,
         Err(_) => return,

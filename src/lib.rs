@@ -1,6 +1,6 @@
 use std::sync::{Arc};
 use tokio::sync::{Mutex};
-use serde::{Serialize, Serializer, ser::SerializeStruct};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use chrono::prelude::*;
 
 pub type ChatLog = Arc<Mutex<ChatVector>>;
@@ -26,4 +26,28 @@ impl Serialize for ChatMessage {
         state.serialize_field("created_at", &self.created_at.to_string())?;
         state.end()
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetRecieve {
+    pub query: Query,
+    pub bearer: Auth
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Auth {
+    pub auth_token: String
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Limiter {
+    pub ltype: String,
+    pub ammount: u16
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Query  {
+    pub qtype: String,
+    pub guild_id: String,
+    pub limiter: Limiter
 }
