@@ -29,7 +29,7 @@ impl Serialize for ChatMessage {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SetRecieve {
+pub struct SetReceive {
     pub query: Query,
     pub bearer: Auth
 }
@@ -42,12 +42,13 @@ pub struct Auth {
 #[derive(Debug, Deserialize)]
 pub struct Limiter {
     pub ltype: String,
-    pub ammount: u16
+    pub amount: u16
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Query  {
     pub qtype: String,
     pub guild_id: String,
-    pub limiter: Limiter
+    pub limiter: Limiter,
+    pub message: String
 }

@@ -48,41 +48,19 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate:
 async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &crate::lib::ChatLog) {
     println!("[INCOMING] Received message from {}: {:?}", client_id, msg);
 
-    // Parse message as a JSON input parameter from stringified input.
-    let json: crate::lib::SetRecieve = serde_json::from_str(&msg.to_str().unwrap()).expect("JSON format INVALID");
-    println!("{:#?}", json);
-
     let message = match msg.to_str() {
         Ok(v) => v,
         Err(_) => return,
     };
 
-    println!("{:?}", chat_log);
-
-    // let logs = Arc::downgrade(&chat_log);
+    // Parse message as a JSON input parameter from stringified input.
+    let json: crate::lib::SetReceive = serde_json::from_str(&message).expect("JSON format INVALID");
+    
+    println!("{:?}", json.query);
     let mut logs = chat_log.lock().await;
 
-    logs.push(crate::lib::ChatMessage {
-        content: msg.to_str().unwrap().to_string(),
-        author: client_id.to_string(),
-        created_at: chrono::Utc::now(),
-        id: uuid::Uuid::new_v4()
-    });
-
-    if message == "ping" || message == "ping\n" {
-        let locked = clients.lock().await;
-
-        match locked.get(client_id) {
-            Some(v) => {
-                if let Some(sender) = &v.sender {
-                    let _ = sender.send(Ok(Message::text("pong")));
-                }
-            }
-            None => return,
-        }
-        
-        return;
-    }else if message == "query.all" {
+    if json.query.qtype.starts_with("get") {
+        // Only serves messages.
         let locked = clients.lock().await;
 
         let clone_logs = logs.clone();
@@ -95,5 +73,26 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             }
             None => return,
         }
+    }else if json.query.qtype.starts_with("set") {
+        // Store Message in Logs
+        logs.push(crate::lib::ChatMessage {
+            content: json.query.message.to_string(),
+            author: client_id.to_string(),
+            created_at: chrono::Utc::now(),
+            id: uuid::Uuid::new_v4()
+        });
+    }else {
+        let locked = clients.lock().await;
+
+        match locked.get(client_id) {
+            Some(v) => {
+                if let Some(sender) = &v.sender {
+                    let _ = sender.send(Ok(Message::text("pong")));
+                }
+            }
+            None => return,
+        }
+        
+        return;
     }
 }
