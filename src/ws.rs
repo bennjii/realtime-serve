@@ -4,7 +4,6 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
-use std::io::BufWriter;
 
 pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate::lib::ChatLog) {
     println!("establishing client connection... {:?}", ws);
@@ -54,7 +53,23 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     };
 
     // Parse message as a JSON input parameter from stringified input.
-    let json: crate::lib::SetReceive = serde_json::from_str(&message).expect("JSON format INVALID");
+    let json: crate::lib::SetReceive = match serde_json::from_str(&message) {
+        Ok(v) => v,
+        Err(e) => {
+            let locked = clients.lock().await;
+
+            match locked.get(client_id) {
+                Some(v) => {
+                    if let Some(sender) = &v.sender {
+                        let _ = sender.send(Ok(Message::text(format!("{{ \"message\": \"{}\", \"type\": \"error\" }}", e))));
+                    }
+
+                    return;
+                }
+                None => return,
+            }
+        }
+    };
     
     println!("{:?}", json.query);
     let mut logs = chat_log.lock().await;
@@ -87,12 +102,14 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
         match locked.get(client_id) {
             Some(v) => {
                 if let Some(sender) = &v.sender {
-                    let _ = sender.send(Ok(Message::text("pong")));
+                    let _ = sender.send(Ok(Message::text(format!("{{ \"type\": \"reply\", \"message\": \"{}\" }}", client_id.to_string()))));
                 }
             }
             None => return,
         }
         
+        todo!("Write Implementation that allows for event hooking - such that a user can wait and listen for message events, and all other types + better query schema.");
         return;
     }
 }
+
