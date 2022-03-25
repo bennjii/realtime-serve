@@ -74,7 +74,14 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     println!("{:?}", json.query);
     let mut logs = chat_log.lock().await;
 
-    if json.query.qtype.starts_with("get") {
+    /*
+     *   Diff between:
+     *   - get
+     *   - set
+     *   - init
+     *   - subscribe
+    */
+    if json.query.qtype == "get" {
         // Only serves messages.
         let locked = clients.lock().await;
 
@@ -88,7 +95,8 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             }
             None => return,
         }
-    }else if json.query.qtype.starts_with("set") {
+    }else if json.query.qtype == "set" {
+        // SETTER FUNCTION - PUBLISHING DATA TO SERVER.
         // Store Message in Logs
         logs.push(crate::lib::ChatMessage {
             content: json.query.message.to_string(),
@@ -96,7 +104,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             created_at: chrono::Utc::now(),
             id: uuid::Uuid::new_v4()
         });
-    }else {
+    }else if json.query.qtype == "init" {
         let locked = clients.lock().await;
 
         match locked.get(client_id) {
@@ -107,9 +115,12 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             }
             None => return,
         }
-        
-        todo!("Write Implementation that allows for event hooking - such that a user can wait and listen for message events, and all other types + better query schema.");
-        return;
+    }else if json.query.qtype == "subscribe" {
+        let locked = clients.lock().await;
+
+        if json.query.message == "all" {
+            
+        }
     }
 }
 

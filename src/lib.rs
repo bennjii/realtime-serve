@@ -1,4 +1,4 @@
-use std::sync::{Arc};
+use std::{sync::Arc, collections::HashMap};
 use tokio::sync::{Mutex};
 use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use chrono::prelude::*;
@@ -28,6 +28,13 @@ impl Serialize for ChatMessage {
     }
 }
 
+pub struct Subscriptions {
+    pub subscripter: String,
+    pub subscription: String
+}
+
+pub type Subscribe = Arc<Mutex<HashMap<String, Subscriptions>>>;
+
 #[derive(Debug, Deserialize)]
 pub struct SetReceive {
     pub query: Query,
@@ -48,7 +55,8 @@ pub struct Limiter {
 #[derive(Debug, Deserialize)]
 pub struct Query  {
     pub qtype: String,
-    pub guild_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: String,
     pub limiter: Limiter,
     pub message: String
 }
