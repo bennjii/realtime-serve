@@ -1,5 +1,4 @@
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
-use realtime_serve::Subscriptions;
 use tokio::sync::{mpsc, Mutex};
 use warp::{ws::Message, Filter, Rejection};
 mod handlers;
@@ -42,6 +41,6 @@ fn with_chat(chat_log: lib::ChatLog) -> impl Filter<Extract = (lib::ChatLog,), E
     warp::any().map(move || chat_log.clone())
 }
 
-fn with_subscriptions(subscriptions: lib::Subscribe) -> impl Filter<Extract = (Subscriptions,), Error = Infallible> + Clone {
+fn with_subscriptions(subscriptions: lib::Subscribe) -> impl Filter<Extract = (lib::Subscribe,), Error = Infallible> + Clone {
     warp::any().map(move || subscriptions.clone())
 }

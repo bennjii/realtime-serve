@@ -1,18 +1,31 @@
 use std::{sync::Arc, collections::HashMap};
 use tokio::sync::{Mutex};
-use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct, Deserializer, de};
 use chrono::prelude::*;
+use std::str::FromStr;
+use std::fmt::Display;
 
 pub type ChatLog = Arc<Mutex<ChatVector>>;
 
 type ChatVector = Vec<ChatMessage>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ChatMessage {
     pub content: String,
     pub author: String,
+    #[serde(deserialize_with = "deserialize_from_str")]
     pub created_at: DateTime<Utc>,
     pub id: uuid::Uuid
+}
+
+fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<S, D::Error>
+where
+    S: FromStr,      // Required for S::from_str...
+    S::Err: Display, // Required for .map_err(de::Error::custom)
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    S::from_str(&s).map_err(de::Error::custom)
 }
 
 impl Serialize for ChatMessage {
@@ -28,12 +41,7 @@ impl Serialize for ChatMessage {
     }
 }
 
-pub struct Subscriptions {
-    pub subscripter: String,
-    pub subscription: String
-}
-
-pub type Subscribe = Arc<Mutex<HashMap<String, Subscriptions>>>;
+pub type Subscribe = Arc<Mutex<HashMap<String, Vec<String>>>>;
 
 #[derive(Debug, Deserialize)]
 pub struct SetReceive {

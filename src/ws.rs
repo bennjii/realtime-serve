@@ -1,11 +1,11 @@
-use crate::{Client, Clients};
+use crate::{Client, Clients, lib::Subscribe, lib::ChatLog, lib::SetReceive, lib::ChatMessage};
 use futures::{FutureExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 
-pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate::lib::ChatLog) {
+pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: ChatLog, subscriptions: Subscribe) {
     println!("establishing client connection... {:?}", ws);
 
     let (client_ws_sender, mut client_ws_rcv) = ws.split();
@@ -37,23 +37,21 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: crate:
             }
         };
 
-        client_msg(&uuid, msg, &clients, &chat_log).await;
+        client_msg(&uuid, msg, &clients, &chat_log, &subscriptions).await;
     }
 
     clients.lock().await.remove(&uuid);
     println!("{} disconnected", uuid);
 }
 
-async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &crate::lib::ChatLog) {
-    println!("[INCOMING] Received message from {}: {:?}", client_id, msg);
-
+async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &ChatLog, subscriptions: &Subscribe) {
     let message = match msg.to_str() {
         Ok(v) => v,
         Err(_) => return,
     };
 
     // Parse message as a JSON input parameter from stringified input.
-    let json: crate::lib::SetReceive = match serde_json::from_str(&message) {
+    let json: SetReceive = match serde_json::from_str(&message) {
         Ok(v) => v,
         Err(e) => {
             let locked = clients.lock().await;
@@ -71,7 +69,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
         }
     };
     
-    println!("{:?}", json.query);
+    println!("Received Query: {:?}", json.query.qtype);
     let mut logs = chat_log.lock().await;
 
     /*
@@ -98,12 +96,41 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     }else if json.query.qtype == "set" {
         // SETTER FUNCTION - PUBLISHING DATA TO SERVER.
         // Store Message in Logs
-        logs.push(crate::lib::ChatMessage {
+
+        logs.push(ChatMessage {
             content: json.query.message.to_string(),
             author: client_id.to_string(),
             created_at: chrono::Utc::now(),
             id: uuid::Uuid::new_v4()
         });
+
+        let subscriptions_locked = subscriptions.lock().await;
+
+        match subscriptions_locked.get(&json.query.location) {
+            Some(variance) => {
+                println!("Updating all NEEDED users for change to {}: {:?}", json.query.location, variance);
+
+                for client in variance {
+                    let locked = clients.lock().await;
+
+                    match locked.get(client) {
+                        Some(v) => {
+                            if let Some(sender) = &v.sender {
+                                let _ = sender.send(Ok(Message::text(serde_json::to_string(&ChatMessage {
+                                    content: json.query.message.to_string(),
+                                    author: client_id.to_string(),
+                                    created_at: chrono::Utc::now(),
+                                    id: uuid::Uuid::new_v4()
+                                }).unwrap())));
+                            }
+                        }
+                        None => return,
+                    }
+                }
+            }
+            None => return,
+        }
+
     }else if json.query.qtype == "init" {
         let locked = clients.lock().await;
 
@@ -116,10 +143,25 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             None => return,
         }
     }else if json.query.qtype == "subscribe" {
-        let locked = clients.lock().await;
+        println!("[evt]: Subscription Event");
+        let mut subscriptions_locked = subscriptions.lock().await;
 
         if json.query.message == "all" {
-            
+            match subscriptions_locked.get(&json.query.location) {
+                Some(v) => {
+                    let mut new_v = v.clone();
+                    new_v.push(client_id.to_string());
+
+                    println!("Merged Existing Subscription: {:?}", new_v);
+
+                    subscriptions_locked.insert(json.query.location, new_v);
+                },
+                None => {
+                    println!("Created New Subscription: {:?}", vec![client_id.to_string()]);
+
+                    subscriptions_locked.insert(json.query.location,vec![client_id.to_string()]);
+                }
+            }
         }
     }
 }
