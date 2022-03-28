@@ -46,7 +46,8 @@ pub type Subscribe = Arc<Mutex<HashMap<String, Vec<String>>>>;
 #[derive(Debug, Deserialize)]
 pub struct SetReceive {
     pub query: Query,
-    pub bearer: Auth
+    pub bearer: Auth,
+    pub nonce: String
 }
 
 #[derive(Debug, Deserialize)]
