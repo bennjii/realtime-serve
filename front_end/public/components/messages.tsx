@@ -13,16 +13,22 @@ export default function Messages() {
     const [ messages, setMessages, messagesRef ] = useStateRef([]);
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
+    const [ subd, setSubd ] = useState(false);
+
     useEffect(() => {
         ws.init(() => {
             ws.sendQuery(new Query().subscribe("all").in("1"))
                 .then((sub: { message: string; nonce: string; type: string; }) => {
+                    setSubd(true);
+
                     subscriptions.push({ ...sub, location: "1", call: (e) => {
                         console.log('Recieved message', e, 'n', messagesRef);
                         insertMessage(e);
                     } });
                 });
         });
+
+        window.onclose = unsubscribe;
     }, []);
 
     const sendMessage = () => {
@@ -45,7 +51,11 @@ export default function Messages() {
     }
 
     const unsubscribe = () => {
-        // ws.
+        ws.sendQuery(new Query().unsubscribe("all").in("1"))
+            .then((e: any) => {
+                console.log(e);
+                setSubd(false);
+            })
     }
 
     return (
@@ -64,7 +74,7 @@ export default function Messages() {
 			<input type="text" onChange={(e) => setMessage(e.currentTarget.value)} /> 
             <button onClick={sendMessage}>Send</button> 
             <button onClick={fetchNew}>Query New</button>
-            <button onClick={unsubscribe}>Unsubscribe</button>
+            <button onClick={unsubscribe}>Unsubscribe, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
 
             <div>
                 {

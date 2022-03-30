@@ -128,6 +128,12 @@ class Query {
         this.request.query.message = message ? message : "";
         return this;
     }
+
+    unsubscribe(message?: string) {
+        this.request.query.qtype = "unsubscribe";
+        this.request.query.message = message ? message : "";
+        return this;
+    }
 }
 
 export { RTQueryHandler, Query, subscriptions };

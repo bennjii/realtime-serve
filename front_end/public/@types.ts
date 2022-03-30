@@ -1,6 +1,6 @@
 type Request = {
     query: {
-        qtype: "get" | "set" | "init" | "subscribe", 
+        qtype: "get" | "set" | "init" | "subscribe" | "unsubscribe", 
         message: string,
         location: string,
         limiter?: {
