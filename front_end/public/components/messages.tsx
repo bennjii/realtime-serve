@@ -1,15 +1,16 @@
 import Head from 'next/head'
-import { KeyboardEvent, useEffect, useState } from 'react'
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import styles from '../styles/Home.module.css'
 import config from '../config'
 import { RTQueryHandler, Query, subscriptions } from '../query';
 import { Message } from '../@types';
+import { useStateRef } from '../query/custom_state';
 
 export const isBrowser = typeof window !== "undefined";
 
 export default function Messages() {
     const [ message, setMessage ] = useState("");
-    const [ messages, setMessages ] = useState([]);
+    const [ messages, setMessages, messagesRef ] = useStateRef([]);
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
     useEffect(() => {
@@ -17,7 +18,7 @@ export default function Messages() {
             ws.sendQuery(new Query().subscribe("all").in("1"))
                 .then((sub: { message: string; nonce: string; type: string; }) => {
                     subscriptions.push({ ...sub, location: "1", call: (e) => {
-                        console.log('Recieved message', e, 'n', messages);
+                        console.log('Recieved message', e, 'n', messagesRef);
                         insertMessage(e);
                     } });
                 });
@@ -32,7 +33,8 @@ export default function Messages() {
     }
 
     const insertMessage = (e) => {
-        setMessages([ ...messages, e.content])
+        console.log(messagesRef);
+        setMessages([ ...messagesRef.current, e.content])
     }
 
     const fetchNew = () => {
