@@ -53,7 +53,6 @@ export default function Messages() {
     const unsubscribe = () => {
         ws.sendQuery(new Query().unsubscribe("all").in("1"))
             .then((e: any) => {
-                console.log(e);
                 setSubd(false);
             })
     }

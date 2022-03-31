@@ -13,31 +13,30 @@ function getNonce(): string {
 }
 
 const subscriptions: Subscription[] = new Array();
-
+const request_cache: Query[] = new Array();
 class RTQueryHandler {
     ws: WebSocket;
-    // subscriptions: Subscription[] = [];
 
-    constructor() {
-        this.ws = new WebSocket(config.webSocketUrl);
-    }
+    constructor() { };
 
     public init(onstart?: Function) {
-        console.log(subscriptions);
+        this.ws = new WebSocket(config.webSocketUrl);
 
         this.ws.onmessage = this.handleMessage;
 
         this.ws.onopen = () => {
-            this.sendQuery(new Query().init()).then(e => {
-                console.log("RECIEVED INIT");
-            });
+            this.sendQuery(new Query().init());
 
             if(onstart) onstart();
         }
 
         this.ws.onclose = () => {
             // Restart Lost Connection
-            this.ws = new WebSocket(config.webSocketUrl);
+            this.init();
+
+            subscriptions.map(e => {
+                this.sendQuery(new Query().subscribe(e.message).in(e.location));
+            })
         }
     }
 
@@ -45,34 +44,46 @@ class RTQueryHandler {
         const data_ = JSON.parse(ev.data);
         console.log("Incoming", data_);
 
-        console.log(subscriptions);
         if(data_.type == "update" && subscriptions) subscriptions.find((e) => e.location = data_.location).call(data_)
     }
 
     private wrapQuery(query: Request) {
         console.log("Outgoing", query);
-        this.ws.send(JSON.stringify(query));
+
+        if(this.ws.readyState !== this.ws.OPEN) return false;
+        else {
+            this.ws.send(JSON.stringify(query));
+            return true;
+        }
     }
 
     public sendQuery(query: Query) {
         return new Promise(r => {
             const nonce = getNonce();
 
-            this.wrapQuery({ 
+            const send = this.wrapQuery({ 
                 ...query.request,
                 nonce
             });
 
-            const listener = (_res: MessageEvent<any>) => {
-                try {
-                    let res = JSON.parse(_res.data);
-                    if(res?.nonce == nonce) {
-                        r(res);
-                    }
-                } catch(e) {}
+            if(send) {
+                const listener = (_res: MessageEvent<any>) => {
+                    try {
+                        let res = JSON.parse(_res.data);
+                        if(res?.nonce == nonce) {
+                            r(res);
+                        }
+                    } catch(e) {}
+                }
+    
+                this.ws.addEventListener("message", listener);
+            }else {
+                console.log("Request - Failed. Trying again when connection is restored.");
+                request_cache.push(query);
+                // setTimeout(() => {
+                //     this.sendQuery(query)
+                // }, 50);
             }
-
-            this.ws.addEventListener("message", listener);
         });
     }
 }
