@@ -16,8 +16,11 @@ const subscriptions: Subscription[] = new Array();
 const request_cache: Query[] = new Array();
 class RTQueryHandler {
     ws: WebSocket;
+    latency: number;
 
-    constructor() { };
+    constructor() { 
+        this.latency = 0;
+    };
 
     public init(onstart?: Function) {
         this.ws = new WebSocket(config.webSocketUrl);
@@ -25,7 +28,11 @@ class RTQueryHandler {
         this.ws.onmessage = this.handleMessage;
 
         this.ws.onopen = () => {
-            this.sendQuery(new Query().init());
+            const d = new Date();
+            this.sendQuery(new Query().init()).then(e => {
+                const dt = new Date();
+                this.latency = dt.getTime() - d.getTime(); 
+            });
 
             if(onstart) onstart();
         }

@@ -11,17 +11,20 @@ export const isBrowser = typeof window !== "undefined";
 export default function Messages() {
     const [ message, setMessage ] = useState("");
     const [ messages, setMessages, messagesRef ] = useStateRef([]);
+    const [ feed, setFeed ] = useState("1");
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
     const [ subd, setSubd ] = useState(false);
+    const input_ref = useRef<HTMLInputElement>();
 
     useEffect(() => {
         ws.init(() => {
-            ws.sendQuery(new Query().subscribe("all").in("1"))
+            ws.sendQuery(new Query().subscribe("all").in(feed))
                 .then((sub: { message: string; nonce: string; type: string; }) => {
                     setSubd(true);
+                    fetchNew();
 
-                    subscriptions.push({ ...sub, location: "1", call: (e) => {
+                    subscriptions.push({ ...sub, location: feed, call: (e) => {
                         console.log('Recieved message', e, 'n', messagesRef);
                         insertMessage(e);
                     } });
@@ -29,10 +32,12 @@ export default function Messages() {
         });
 
         window.onclose = unsubscribe;
-    }, []);
+    }, [feed]);
 
     const sendMessage = () => {
-        ws.sendQuery(new Query().set(message).in("1"))
+        input_ref.current.value = "";
+
+        ws.sendQuery(new Query().set(message).in(feed))
             .then((e: { content: Message }) => {
                 // setMessages([ ...messages, e.content])
             });
@@ -44,17 +49,46 @@ export default function Messages() {
     }
 
     const fetchNew = () => {
-        ws.sendQuery(new Query().get("all").in("1"))
-            .then((e: { content: Message[]} ) => {
-                setMessages(e.content);
+        ws.sendQuery(new Query().get("all").in(feed))
+            .then((e: { content: Message[] | string} ) => {
+                if(typeof e == "string" && e == "406" || typeof e == "string" && e == "200") {
+                    console.log("Error in fetching, possibly null feed ", e);
+                }else if (typeof e !== "string" && e.content){
+                    setMessages(e.content as Message[]);
+                }
             })
     }
 
-    const unsubscribe = () => {
-        ws.sendQuery(new Query().unsubscribe("all").in("1"))
-            .then((e: any) => {
+    const unsubscribe = (_feed) => {
+        const sending_feed = _feed;
+        ws.sendQuery(new Query().unsubscribe("all").in(sending_feed))
+            .then((sub: { message: string; nonce: string; type: string; }) => {
                 setSubd(false);
+
+                subscriptions.map((s, i) => {
+                    if(s.location !== sending_feed) subscriptions.splice(i, 1)
+                });
             })
+    }
+
+    const subscribe = async () => {
+        ws.sendQuery(new Query().subscribe("all").in(feed))
+            .then((sub: { message: string; nonce: string; type: string; }) => {
+                setSubd(true);
+
+                subscriptions.push({ ...sub, location: feed, call: (e) => {
+                    console.log('Received message', e, 'n', messagesRef);
+                    insertMessage(e);
+                } });
+            });
+    }
+
+    const setFeedType = async () => {
+        setMessages([]);
+        input_ref.current.value = "";
+
+        unsubscribe(feed);
+        setFeed(message);
     }
 
     return (
@@ -70,10 +104,11 @@ export default function Messages() {
                     })
                 }
             </div>
-			<input type="text" onChange={(e) => setMessage(e.currentTarget.value)} /> 
+			<input ref={input_ref} type="text" onChange={(e) => setMessage(e.currentTarget.value)} /> 
             <button onClick={sendMessage}>Send</button> 
             <button onClick={fetchNew}>Query New</button>
-            <button onClick={unsubscribe}>Unsubscribe, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
+            <button onClick={subd ? unsubscribe : subscribe}>{!subd ? "Subscribe" : "Unsubscribe"}, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
+            <button onClick={setFeedType}>Set Feed</button>
 
             <div>
                 {
@@ -82,10 +117,17 @@ export default function Messages() {
                             {
                                 e.nonce
                             } 
-                             
                         </div>
                     })
                 }
+            </div>
+
+            <div>
+                Current Feed: { feed }
+            </div>
+
+            <div>
+                ms: {ws?.latency}
             </div>
 		</div>
     )

@@ -94,23 +94,54 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     if json.query.qtype == "get" {
         // Only serves messages.
         let clone_logs = logs.clone();
-        return_to_sender(clients, client_id, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\" }}", "reply", serde_json::to_string(&clone_logs).unwrap(), json.query.location, json.nonce)).await;
+        match clone_logs.get(&json.query.location) {
+            Some(v) => {
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\" }}", "reply", serde_json::to_string(&v).unwrap(), json.query.location, json.nonce)).await;
+            },
+            None => {
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
+            }
+        }
     }else if json.query.qtype == "set" {
         // SETTER FUNCTION - PUBLISHING DATA TO SERVER.
         // Store Message in Logs
 
-        logs.push(ChatMessage {
-            content: json.query.message.to_string(),
-            author: client_id.to_string(),
-            created_at: chrono::Utc::now(),
-            id: uuid::Uuid::new_v4()
-        });
+        let location = json.query.location.clone();
+
+        match logs.get(&json.query.location) {
+            Some(v) => {
+                let mut new_v = v.clone();
+                new_v.push(ChatMessage {
+                    content: json.query.message.to_string(),
+                    author: client_id.to_string(),
+                    created_at: chrono::Utc::now(),
+                    id: uuid::Uuid::new_v4()
+                });
+
+                println!("Merged Existing Subscription: {:?}", new_v);
+
+                logs.insert(json.query.location, new_v);
+
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+            },
+            None => {
+                println!("Created New Subscription: {:?}", vec![client_id.to_string()]);
+
+                logs.insert(json.query.location,vec![ChatMessage {
+                    content: json.query.message.to_string(),
+                    author: client_id.to_string(),
+                    created_at: chrono::Utc::now(),
+                    id: uuid::Uuid::new_v4()
+                }]);
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+            }
+        }
 
         let subscriptions_locked = subscriptions.lock().await;
 
-        match subscriptions_locked.get(&json.query.location) {
+        match subscriptions_locked.get(&location) {
             Some(variance) => {
-                println!("Updating all NEEDED users for change to {}: {:?}", json.query.location, variance);
+                println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
 
                 for client in variance {
                     return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\" }}", 
@@ -121,7 +152,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                             created_at: chrono::Utc::now(),
                             id: uuid::Uuid::new_v4()
                         }).unwrap(),
-                        json.query.location,
+                        location,
                         json.nonce
                     )).await;
                 }

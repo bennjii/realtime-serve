@@ -5,8 +5,7 @@ use chrono::prelude::*;
 use std::str::FromStr;
 use std::fmt::Display;
 
-pub type ChatLog = Arc<Mutex<ChatVector>>;
-
+pub type ChatLog = Arc<Mutex<HashMap<String, ChatVector>>>;
 type ChatVector = Vec<ChatMessage>;
 
 #[derive(Debug, Clone, Deserialize)]

@@ -1,4 +1,5 @@
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use realtime_serve::{ChatMessage, ChatLog};
 use tokio::sync::{mpsc, Mutex};
 use warp::{ws::Message, Filter, Rejection};
 mod handlers;
@@ -17,7 +18,7 @@ type Result<T> = std::result::Result<T, Rejection>;
 #[tokio::main]
 async fn main() {
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
-    let chat_log = Arc::new(Mutex::new(vec!()));
+    let chat_log: lib::ChatLog = Arc::new(Mutex::new(HashMap::new()));
     let subscriptions: lib::Subscribe = Arc::new(Mutex::new(HashMap::new()));
 
     println!("[SERVICE] ws_handler::start");
