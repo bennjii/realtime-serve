@@ -28,11 +28,7 @@ class RTQueryHandler {
         this.ws.onmessage = this.handleMessage;
 
         this.ws.onopen = () => {
-            const d = new Date();
-            this.sendQuery(new Query().init()).then(e => {
-                const dt = new Date();
-                this.latency = dt.getTime() - d.getTime(); 
-            });
+            this.sendQuery(new Query().init());
 
             if(onstart) onstart();
         }
@@ -65,6 +61,8 @@ class RTQueryHandler {
     }
 
     public sendQuery(query: Query) {
+        const d = new Date();
+
         return new Promise(r => {
             const nonce = getNonce();
 
@@ -78,6 +76,9 @@ class RTQueryHandler {
                     try {
                         let res = JSON.parse(_res.data);
                         if(res?.nonce == nonce) {
+                            const dt = new Date();
+                            this.latency = dt.getTime() - d.getTime(); 
+
                             r(res);
                         }
                     } catch(e) {}

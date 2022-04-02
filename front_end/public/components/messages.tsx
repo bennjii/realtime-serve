@@ -31,8 +31,8 @@ export default function Messages() {
                 });
         });
 
-        window.onclose = unsubscribe;
-    }, [feed]);
+        window.onclose = () => unsubscribe();
+    }, []);
 
     const sendMessage = () => {
         input_ref.current.value = "";
@@ -59,24 +59,25 @@ export default function Messages() {
             })
     }
 
-    const unsubscribe = (_feed) => {
+    const unsubscribe = (_feed?: string) => {
         const sending_feed = _feed;
-        ws.sendQuery(new Query().unsubscribe("all").in(sending_feed))
+        ws.sendQuery(new Query().unsubscribe("all").in(_feed ? sending_feed : feed))
             .then((sub: { message: string; nonce: string; type: string; }) => {
                 setSubd(false);
 
                 subscriptions.map((s, i) => {
-                    if(s.location !== sending_feed) subscriptions.splice(i, 1)
+                    if(s.location !== _feed ? sending_feed : feed) subscriptions.splice(i, 1)
                 });
             })
     }
 
-    const subscribe = async () => {
-        ws.sendQuery(new Query().subscribe("all").in(feed))
+    const subscribe = async (_feed?: string) => {
+        ws.sendQuery(new Query().subscribe("all").in(_feed ? _feed : feed))
             .then((sub: { message: string; nonce: string; type: string; }) => {
                 setSubd(true);
+                fetchNew();
 
-                subscriptions.push({ ...sub, location: feed, call: (e) => {
+                subscriptions.push({ ...sub, location: _feed ? _feed : feed, call: (e) => {
                     console.log('Received message', e, 'n', messagesRef);
                     insertMessage(e);
                 } });
@@ -84,11 +85,22 @@ export default function Messages() {
     }
 
     const setFeedType = async () => {
+        console.time("a");
         setMessages([]);
+
+        console.timeStamp("a");
         input_ref.current.value = "";
 
-        unsubscribe(feed);
+        console.timeStamp("a");
         setFeed(message);
+
+        console.timeStamp("a");
+        await unsubscribe(feed);
+
+        console.timeStamp("a");
+        subscribe(message);
+
+        console.timeEnd("a");
     }
 
     return (
@@ -107,7 +119,7 @@ export default function Messages() {
 			<input ref={input_ref} type="text" onChange={(e) => setMessage(e.currentTarget.value)} /> 
             <button onClick={sendMessage}>Send</button> 
             <button onClick={fetchNew}>Query New</button>
-            <button onClick={subd ? unsubscribe : subscribe}>{!subd ? "Subscribe" : "Unsubscribe"}, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
+            <button onClick={subd ? () => unsubscribe() : () => subscribe()}>{!subd ? "Subscribe" : "Unsubscribe"}, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
             <button onClick={setFeedType}>Set Feed</button>
 
             <div>
