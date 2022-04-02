@@ -43,18 +43,28 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, chat_log: ChatLo
     clients.lock().await.remove(&uuid);
     println!("{} disconnected", uuid);
 
-    let subscriptions_locked = subscriptions.lock().await;
+    let mut subscriptions_locked = subscriptions.lock().await;
+    let new_subscriptions = subscriptions_locked.clone();
 
-    for (key, value) in &*subscriptions_locked {
+    for (key, value) in &new_subscriptions {
         let mut new_v = value.clone();
 
-        let index = new_v.iter().position(|x| *x == uuid.clone()).unwrap();
-        new_v.remove(index);
-
-        println!("Merged Existing Subscription: {:?}", new_v);
-
-        subscriptions.lock().await.insert(key.to_string(), new_v);
+        let index = new_v.iter().position(|x| *x == uuid.clone());
+        
+        match index {
+            Some(t) => {
+                println!("Trying Key {}", t);
+                new_v.remove(t);
+                subscriptions_locked.insert(key.to_string(), new_v);
+                println!("Merged Existing Subscription");
+            },
+            None => {
+                println!("Tried Key {}", key);
+            },
+        };
     }
+        
+    println!("[evt]: Client Removed Successfully");
 }
 
 async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: &ChatLog, subscriptions: &Subscribe) {
