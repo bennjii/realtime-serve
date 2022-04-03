@@ -1,5 +1,4 @@
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
-use realtime_serve::{ChatMessage, ChatLog};
 use tokio::sync::{mpsc, Mutex};
 use warp::{ws::Message, Filter, Rejection};
 mod handlers;

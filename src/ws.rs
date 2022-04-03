@@ -1,5 +1,6 @@
-use crate::{Client, Clients, lib::Subscribe, lib::ChatLog, lib::SetReceive, lib::ChatMessage};
+use crate::{Client, Clients, lib::Subscribe, lib::ChatLog, lib::SetReceive, lib::ChatMessage, lib::TypeVec};
 use futures::{FutureExt, StreamExt};
+use realtime_serve::ChatVector;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
@@ -84,19 +85,12 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
     println!("Received Query: {:?}", json.query.qtype);
     let mut logs = chat_log.lock().await;
 
-    /*
-     *   Diff between:
-     *   - get
-     *   - set
-     *   - init
-     *   - subscribe & unsubscribe
-    */
     if json.query.qtype == "get" {
         // Only serves messages.
         let clone_logs = logs.clone();
         match clone_logs.get(&json.query.location) {
             Some(v) => {
-                return_to_sender(clients, client_id, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\" }}", "reply", serde_json::to_string(&v).unwrap(), json.query.location, json.nonce)).await;
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", "reply", serde_json::to_string(&v).unwrap(), json.query.location, json.nonce)).await;
             },
             None => {
                 return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
@@ -107,32 +101,42 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
         // Store Message in Logs
 
         let location = json.query.location.clone();
+        let person = &json.bearer.auth_id.clone();
 
         match logs.get(&json.query.location) {
             Some(v) => {
                 let mut new_v = v.clone();
-                new_v.push(ChatMessage {
+                new_v.push(TypeVec::Chat(ChatMessage {
                     content: json.query.message.to_string(),
-                    author: client_id.to_string(),
+                    session_author: client_id.to_string(),
+                    author: json.bearer.auth_id,
                     created_at: chrono::Utc::now(),
                     id: uuid::Uuid::new_v4()
-                });
+                }));
 
-                println!("Merged Existing Subscription: {:?}", new_v);
+                println!("Merged Existing Chat Vector: {:?}", new_v);
 
                 logs.insert(json.query.location, new_v);
 
                 return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
             },
             None => {
-                println!("Created New Subscription: {:?}", vec![client_id.to_string()]);
-
-                logs.insert(json.query.location,vec![ChatMessage {
+                println!("Created New Chat Vector: {:?}", vec![TypeVec::Chat(ChatMessage {
                     content: json.query.message.to_string(),
-                    author: client_id.to_string(),
+                    session_author: client_id.to_string(),
+                    author: "".to_string(),
                     created_at: chrono::Utc::now(),
                     id: uuid::Uuid::new_v4()
-                }]);
+                })]);
+
+                logs.insert(json.query.location,vec![TypeVec::Chat(ChatMessage {
+                    content: json.query.message.to_string(),
+                    session_author: client_id.to_string(),
+                    author: json.bearer.auth_id,
+                    created_at: chrono::Utc::now(),
+                    id: uuid::Uuid::new_v4()
+                })]);
+
                 return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
             }
         }
@@ -141,14 +145,16 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
 
         match subscriptions_locked.get(&location) {
             Some(variance) => {
+                
                 println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
 
                 for client in variance {
-                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\" }}", 
+                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
                         "update", 
                         serde_json::to_string(&ChatMessage {
                             content: json.query.message.to_string(),
-                            author: client_id.to_string(),
+                            author: person.to_string(),
+                            session_author: client_id.to_string(),
                             created_at: chrono::Utc::now(),
                             id: uuid::Uuid::new_v4()
                         }).unwrap(),
@@ -209,6 +215,17 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                 }
             }
         }
+    }else if json.query.qtype.starts_with("room") {
+        // Note: No need to create a room, performing 'set' in a room that does not exist creates the room automatically. 
+        if json.query.qtype.ends_with("get") {
+            println!("received room");
+        }else if json.query.qtype.ends_with("set") {
+            println!("edit room (e.g. giving ICE candidates, give answer, ");
+        }else if json.query.qtype.ends_with("delete") {
+            println!("removing room");
+        }
+
+        // Subscriptions follow the standard procedure as rooms are interchangeable with servers. 
     }
 }
 

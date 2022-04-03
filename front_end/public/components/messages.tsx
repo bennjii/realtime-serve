@@ -3,7 +3,7 @@ import { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import styles from '../styles/Home.module.css'
 import config from '../config'
 import { RTQueryHandler, Query, subscriptions } from '../query';
-import { Message } from '../@types';
+import { Message, QueryResponse } from '../@types';
 import { useStateRef } from '../query/custom_state';
 
 export const isBrowser = typeof window !== "undefined";
@@ -18,99 +18,110 @@ export default function Messages() {
     const input_ref = useRef<HTMLInputElement>();
 
     useEffect(() => {
-        ws.init(() => {
-            ws.sendQuery(new Query().subscribe("all").in(feed))
-                .then((sub: { message: string; nonce: string; type: string; }) => {
+        ws.init().then(e => {
+            const query =
+                new Query(ws).in(feed).subscribe("all", (payload: { message: string; nonce: string; type: string; }) => {
+                    console.log("Received response, setting sub vector addition!");
                     setSubd(true);
                     fetchNew();
 
-                    subscriptions.push({ ...sub, location: feed, call: (e) => {
-                        console.log('Recieved message', e, 'n', messagesRef);
+                    subscriptions.push({ ...payload, location: feed, call: (e: any) => {
+                        console.log('Received message', e, 'n', messagesRef);
                         insertMessage(e);
                     } });
                 });
-        });
 
-        window.onclose = () => unsubscribe();
+            window.onclose = () => {
+                subscriptions.map(e => new Query(ws).in(e.location).unsubscribe("all", () => {}))
+            }
+        })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const sendMessage = () => {
         input_ref.current.value = "";
 
-        ws.sendQuery(new Query().set(message).in(feed))
-            .then((e: { content: Message }) => {
+        new Query(ws).in(feed).set(message)
+            .then((e: QueryResponse) => {
                 // setMessages([ ...messages, e.content])
             });
     }
 
-    const insertMessage = (e) => {
+    const insertMessage = (e: { content: any; }) => {
         console.log(messagesRef);
-        setMessages([ ...messagesRef.current, e.content])
+        setMessages([ ...messagesRef.current, { Chat: e.content }])
     }
 
-    const fetchNew = () => {
-        ws.sendQuery(new Query().get("all").in(feed))
-            .then((e: { content: Message[] | string} ) => {
-                if(typeof e == "string" && e == "406" || typeof e == "string" && e == "200") {
+    const fetchNew = (_feed?: string) => {
+        new Query(ws).in(_feed ? _feed : feed).get("all")
+            .then((e: QueryResponse) => {
+                console.log("Fetch Received.");
+                if(e.response.message == "406" || e.response.message == "200" ) {
                     console.log("Error in fetching, possibly null feed ", e);
-                }else if (typeof e !== "string" && e.content){
-                    setMessages(e.content as Message[]);
+                }else if (e.response.content){
+                    setMessages(e.response.content as Message[]);
                 }
-            })
+            });
     }
 
     const unsubscribe = (_feed?: string) => {
         const sending_feed = _feed;
-        ws.sendQuery(new Query().unsubscribe("all").in(_feed ? sending_feed : feed))
-            .then((sub: { message: string; nonce: string; type: string; }) => {
+
+        new Query(ws).in(_feed ? sending_feed : feed).unsubscribe("all", (sub: QueryResponse) => {
+            console.log("Unsubscribing...", sub);
+
+            if(sub.response.message == "OK") {
                 setSubd(false);
 
                 subscriptions.map((s, i) => {
                     if(s.location !== _feed ? sending_feed : feed) subscriptions.splice(i, 1)
                 });
-            })
+            }else {
+                console.log("Something went wrong sending request ", sub.ref, ".. ->", sub.response.message);
+            }
+        });
     }
 
     const subscribe = async (_feed?: string) => {
-        ws.sendQuery(new Query().subscribe("all").in(_feed ? _feed : feed))
-            .then((sub: { message: string; nonce: string; type: string; }) => {
-                setSubd(true);
-                fetchNew();
+        new Query(ws).in(_feed ? _feed : feed).subscribe("all")
+            .then((sub: QueryResponse) => {
 
-                subscriptions.push({ ...sub, location: _feed ? _feed : feed, call: (e) => {
-                    console.log('Received message', e, 'n', messagesRef);
-                    insertMessage(e);
-                } });
+                if(sub.response.message == "OK" || sub.response.message == "200") {
+                    setSubd(true);
+                    fetchNew(_feed ? _feed : feed);
+
+                    console.log(sub);
+                    const { message, nonce, type } = sub.response;
+
+                    subscriptions.push({ message, nonce, type, location: _feed ? _feed : feed, call: (e: any) => {
+                        console.log('Received message', e, 'n', messagesRef);
+                        insertMessage(e);
+                    } });
+                }else {
+                    console.log("Something went wrong sending request ", sub.ref, ".. ->", sub.response.message);
+                }
+                
             });
     }
 
     const setFeedType = async () => {
-        console.time("a");
         setMessages([]);
-
-        console.timeStamp("a");
         input_ref.current.value = "";
-
-        console.timeStamp("a");
         setFeed(message);
 
-        console.timeStamp("a");
-        await unsubscribe(feed);
-
-        console.timeStamp("a");
+        // Unsubscribe from old and sub to the new.
+        unsubscribe(feed);
         subscribe(message);
-
-        console.timeEnd("a");
     }
 
     return (
 		<div>
             <div>
                 {
-                    messages.map((e: Message) => {
+                        messages.map(({Chat}: { Chat: Message }) => {
                         return (
-                            <div key={`${e.created_at} ${e.content}`}>
-                                { JSON.stringify(e) }
+                            <div key={`${Chat.created_at} ${Chat.content}`}>
+                                { Chat.content }
                             </div>
                         )
                     })
@@ -118,21 +129,9 @@ export default function Messages() {
             </div>
 			<input ref={input_ref} type="text" onChange={(e) => setMessage(e.currentTarget.value)} /> 
             <button onClick={sendMessage}>Send</button> 
-            <button onClick={fetchNew}>Query New</button>
+            <button onClick={() => fetchNew()}>Query New</button>
             <button onClick={subd ? () => unsubscribe() : () => subscribe()}>{!subd ? "Subscribe" : "Unsubscribe"}, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
             <button onClick={setFeedType}>Set Feed</button>
-
-            <div>
-                {
-                    subscriptions.map(e => {
-                        <div>
-                            {
-                                e.nonce
-                            } 
-                        </div>
-                    })
-                }
-            </div>
 
             <div>
                 Current Feed: { feed }

@@ -5,13 +5,31 @@ use chrono::prelude::*;
 use std::str::FromStr;
 use std::fmt::Display;
 
-pub type ChatLog = Arc<Mutex<HashMap<String, ChatVector>>>;
-type ChatVector = Vec<ChatMessage>;
+pub type ChatLog = Arc<Mutex<HashMap<String, Vec<TypeVec>>>>;
+
+#[derive(Clone, Serialize, Debug, Deserialize)]
+pub enum TypeVec {
+    Chat(ChatMessage),
+    Room(RoomAllocation)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RoomAllocation {
+    pub content: String,
+    pub author: String,
+    pub session_author: String,
+    #[serde(deserialize_with = "deserialize_from_str")]
+    pub created_at: DateTime<Utc>,
+    pub id: uuid::Uuid
+}
+
+pub type ChatVector = Vec<ChatMessage>;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChatMessage {
     pub content: String,
     pub author: String,
+    pub session_author: String,
     #[serde(deserialize_with = "deserialize_from_str")]
     pub created_at: DateTime<Utc>,
     pub id: uuid::Uuid
@@ -40,6 +58,19 @@ impl Serialize for ChatMessage {
     }
 }
 
+impl Serialize for RoomAllocation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 3)?;
+        state.serialize_field("content", &self.content)?;
+        state.serialize_field("author", &self.author)?;
+        state.serialize_field("created_at", &self.created_at.to_string())?;
+        state.end()
+    }
+}
+
 pub type Subscribe = Arc<Mutex<HashMap<String, Vec<String>>>>;
 
 #[derive(Debug, Deserialize)]
@@ -51,7 +82,8 @@ pub struct SetReceive {
 
 #[derive(Debug, Deserialize)]
 pub struct Auth {
-    pub auth_token: String
+    pub auth_token: String,
+    pub auth_id: String
 }
 
 #[derive(Debug, Deserialize)]

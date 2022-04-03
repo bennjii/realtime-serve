@@ -1,3 +1,5 @@
+import { Query } from "./query"
+
 type Request = {
     query: {
         qtype: "get" | "set" | "init" | "subscribe" | "unsubscribe", 
@@ -10,6 +12,7 @@ type Request = {
     },
     bearer: {
         auth_token: string,
+        auth_id: string
     },
     nonce?: string
 }
@@ -26,6 +29,19 @@ export type Subscription = {
     type: string,
     location: string,
     call: Function
+}
+
+export type Response = {
+    type: "error" | "reply" | "update",
+    message: string, // Error Object
+    content?: Message[]
+    location?: string,
+    nonce: string
+}
+
+export type QueryResponse = {
+    response: Response,
+    ref: Query
 }
 
 export default Request;

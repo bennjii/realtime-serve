@@ -1,4 +1,4 @@
-import Request, { Subscription } from '../@types';
+import Request, { Subscription, Response } from '../@types';
 import config from '../config'
 import { randomBytes } from "crypto";
 
@@ -26,21 +26,24 @@ class RTQueryHandler {
         this.ws = new WebSocket(config.webSocketUrl);
 
         this.ws.onmessage = this.handleMessage;
-
-        this.ws.onopen = () => {
-            this.sendQuery(new Query().init());
-
-            if(onstart) onstart();
-        }
-
+        
         this.ws.onclose = () => {
             // Restart Lost Connection
             this.init();
 
             subscriptions.map(e => {
-                this.sendQuery(new Query().subscribe(e.message).in(e.location));
+                new Query(this).in(e.location).subscribe(e.message);
             })
         }
+        
+        return new Promise(r => {
+            this.ws.onopen = () => {
+                new Query(this).init();
+    
+                if(onstart) onstart();
+                r(this);
+            }
+        });
     }
 
     private handleMessage(ev: MessageEvent<any>) {
@@ -97,8 +100,12 @@ class RTQueryHandler {
 }
 
 class Query {
-    request: Request
-    constructor() { 
+    request: Request;
+    ws: RTQueryHandler;
+    callback: Function;
+
+    constructor(websocket: RTQueryHandler) { 
+        this.ws = websocket;
         this.request = {
             query: {
                 qtype: "get", 
@@ -111,6 +118,7 @@ class Query {
             },  
             bearer: {
                 auth_token: "",
+                auth_id: "15c"
             }
         };
     }
@@ -127,31 +135,50 @@ class Query {
     
     init() {
         this.request.query.qtype = "init";
-        return this;
+
+        return this.sendOff();
     }
 
     get(message: string) {
         this.request.query.qtype = "get";
         this.request.query.message = message;
-        return this;
+
+        return this.sendOff();
     }
 
     set(message: string) {
         this.request.query.qtype = "set";
         this.request.query.message = message;
-        return this;
+
+        return this.sendOff();
     }
 
-    subscribe(message?: string) {
+    subscribe(message?: string, callback?: Function) {
         this.request.query.qtype = "subscribe";
         this.request.query.message = message ? message : "";
-        return this;
+        this.callback = callback ? callback : this.callback;
+
+        return this.sendOff();
     }
 
-    unsubscribe(message?: string) {
+    unsubscribe(message?: string, callback?: Function) {
         this.request.query.qtype = "unsubscribe";
         this.request.query.message = message ? message : "";
-        return this;
+        this.callback = callback ? callback : this.callback;
+
+        return this.sendOff();
+    }
+
+    private sendOff(): Promise<{response: Response, ref: Query}> {
+        return new Promise(r => {
+            this.ws.sendQuery(this)
+            .then((e: Response) => {
+                console.log("Returned", e);
+                
+                r({ response: e, ref: this });
+                if(this.callback) this.callback({ response: e, ref: this });
+            })
+        })
     }
 }
 
