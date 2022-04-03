@@ -1,6 +1,7 @@
-use crate::{Client, Clients, lib::Subscribe, lib::ChatLog, lib::SetReceive, lib::ChatMessage, lib::TypeVec};
+use std::collections::HashMap;
+
+use crate::{Client, Clients, lib::Subscribe, lib::ChatLog, lib::SetReceive, lib::ChatMessage, lib::TypeVec, lib::RoomAllocation, lib::Chat};
 use futures::{FutureExt, StreamExt};
-use realtime_serve::ChatVector;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
@@ -96,7 +97,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                 return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
             }
         }
-    }else if json.query.qtype == "set" {
+    }else if json.query.qtype.starts_with("set") {
         // SETTER FUNCTION - PUBLISHING DATA TO SERVER.
         // Store Message in Logs
 
@@ -105,39 +106,85 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
 
         match logs.get(&json.query.location) {
             Some(v) => {
-                let mut new_v = v.clone();
-                new_v.push(TypeVec::Chat(ChatMessage {
-                    content: json.query.message.to_string(),
-                    session_author: client_id.to_string(),
-                    author: json.bearer.auth_id,
-                    created_at: chrono::Utc::now(),
-                    id: uuid::Uuid::new_v4()
-                }));
+                // If placement already exists...
+                match v {
+                    TypeVec::Chat(chat) => {
+                        let mut new_v = chat.clone();
 
-                println!("Merged Existing Chat Vector: {:?}", new_v);
+                        new_v.messages.push(ChatMessage {
+                            content: json.query.message.to_string(),
+                            session_author: client_id.to_string(),
+                            author: json.bearer.auth_id,
+                            created_at: chrono::Utc::now(),
+                            id: uuid::Uuid::new_v4()
+                        });
+    
+                        println!("Merged Existing Chat Vector: {:?}", new_v);
+                        logs.insert(json.query.location, TypeVec::Chat(new_v));
 
-                logs.insert(json.query.location, new_v);
+                        return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    },
+                    TypeVec::Room(room) => {
+                        let new_v = room.clone();
 
-                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                        let json: HashMap<String, String> = match serde_json::from_str(&json.query.message) {
+                            Ok(v) => {
+                                println!("{:?}", v);
+
+                                logs.insert(json.query.location, TypeVec::Room(RoomAllocation {
+                                    callee_candidates: "".to_string(),
+                                    caller_candidates: "".to_string(),
+                                    offer: "".to_string(),
+                                    id: new_v.id,
+                                    pt: "room".to_string()
+                                }));
+
+                                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+
+                                v
+                            },
+                            Err(e) => {
+                                return return_to_sender(clients, client_id, format!("{{ \"message\": \"{}\", \"type\": \"error\" }}", e)).await;
+                            }
+                        };
+                    },
+                    _ => {
+                        return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    }
+                }
             },
             None => {
-                println!("Created New Chat Vector: {:?}", vec![TypeVec::Chat(ChatMessage {
-                    content: json.query.message.to_string(),
-                    session_author: client_id.to_string(),
-                    author: "".to_string(),
-                    created_at: chrono::Utc::now(),
-                    id: uuid::Uuid::new_v4()
-                })]);
+                match json.query.qtype.as_str() {
+                    "set" => {
+                        logs.insert(json.query.location,TypeVec::Chat(Chat {
+                            messages: vec![ChatMessage {
+                                content: json.query.message.to_string(),
+                                session_author: client_id.to_string(),
+                                author: json.bearer.auth_id,
+                                created_at: chrono::Utc::now(),
+                                id: uuid::Uuid::new_v4()
+                            }],
+                            name: "Yoki".to_string(),
+                            pt: "chat".to_string()
+                        }));
 
-                logs.insert(json.query.location,vec![TypeVec::Chat(ChatMessage {
-                    content: json.query.message.to_string(),
-                    session_author: client_id.to_string(),
-                    author: json.bearer.auth_id,
-                    created_at: chrono::Utc::now(),
-                    id: uuid::Uuid::new_v4()
-                })]);
+                        return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    },
+                    "set.room" => {
+                        logs.insert(json.query.location, TypeVec::Room(RoomAllocation {
+                            callee_candidates: "".to_string(),
+                            caller_candidates: "".to_string(),
+                            offer: "".to_string(),
+                            id: uuid::Uuid::new_v4(),
+                            pt: "room".to_string()
+                        }));
 
-                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                        return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    },
+                    _ => {
+                        return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    }
+                }
             }
         }
 
@@ -145,7 +192,6 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
 
         match subscriptions_locked.get(&location) {
             Some(variance) => {
-                
                 println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
 
                 for client in variance {
@@ -219,8 +265,6 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
         // Note: No need to create a room, performing 'set' in a room that does not exist creates the room automatically. 
         if json.query.qtype.ends_with("get") {
             println!("received room");
-        }else if json.query.qtype.ends_with("set") {
-            println!("edit room (e.g. giving ICE candidates, give answer, ");
         }else if json.query.qtype.ends_with("delete") {
             println!("removing room");
         }
