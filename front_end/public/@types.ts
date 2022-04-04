@@ -34,7 +34,12 @@ export type Subscription = {
 export type Response = {
     type: "error" | "reply" | "update",
     message: string, // Error Object
-    content?: Message[]
+    content?: {
+        Chat: {
+            messages: Message[],
+            title: string
+        },
+    },
     location?: string,
     nonce: string
 }
