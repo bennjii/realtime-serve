@@ -147,7 +147,23 @@ class Query {
     }
 
     set(message: string) {
-        this.request.query.qtype = "set";
+        if(message == "room") {
+            this.request.query.qtype = "set.room";
+            this.request.query.message = "init";
+        }else {
+            this.request.query.qtype = "set";
+            this.request.query.message = message;
+        }
+
+        return this.sendOff();
+    }
+
+    /**
+     * 
+     * @param message Indicates the parameter being changed. format: [property].[new_value]
+     */
+    update(message: string) {
+        this.request.query.qtype = "update";
         this.request.query.message = message;
 
         return this.sendOff();

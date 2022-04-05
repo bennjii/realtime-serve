@@ -123,6 +123,30 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                         logs.insert(json.query.location, TypeVec::Chat(new_v));
 
                         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+                    
+                        let subscriptions_locked = subscriptions.lock().await;
+
+                        match subscriptions_locked.get(&location) {
+                            Some(variance) => {
+                                println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
+                
+                                for client in variance {
+                                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
+                                        "update", 
+                                        serde_json::to_string(&ChatMessage {
+                                            content: json.query.message.to_string(),
+                                            author: person.to_string(),
+                                            session_author: client_id.to_string(),
+                                            created_at: chrono::Utc::now(),
+                                            id: uuid::Uuid::new_v4()
+                                        }).unwrap(),
+                                        location,
+                                        json.nonce
+                                    )).await;
+                                }
+                            }
+                            None => return,
+                        }
                     },
                     TypeVec::Room(room) => {
                         let new_v = room.clone();
@@ -140,6 +164,30 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                                 }));
 
                                 return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+
+                                let subscriptions_locked = subscriptions.lock().await;
+
+                                match subscriptions_locked.get(&location) {
+                                    Some(variance) => {
+                                        println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
+                        
+                                        for client in variance {
+                                            return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
+                                                "update", 
+                                                serde_json::to_string(&RoomAllocation {
+                                                    callee_candidates: "".to_string(),
+                                                    caller_candidates: "".to_string(),
+                                                    offer: "".to_string(),
+                                                    id: new_v.id,
+                                                    pt: "room".to_string()
+                                                }).unwrap(),
+                                                location,
+                                                json.nonce
+                                            )).await;
+                                        }
+                                    }
+                                    None => return,
+                                }
 
                                 v
                             },
@@ -169,6 +217,30 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                         }));
 
                         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+
+                        let subscriptions_locked = subscriptions.lock().await;
+
+                        match subscriptions_locked.get(&location) {
+                            Some(variance) => {
+                                println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
+                
+                                for client in variance {
+                                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
+                                        "update", 
+                                        serde_json::to_string(&ChatMessage {
+                                            content: json.query.message.to_string(),
+                                            author: person.to_string(),
+                                            session_author: client_id.to_string(),
+                                            created_at: chrono::Utc::now(),
+                                            id: uuid::Uuid::new_v4()
+                                        }).unwrap(),
+                                        location,
+                                        json.nonce
+                                    )).await;
+                                }
+                            }
+                            None => return,
+                        }
                     },
                     "set.room" => {
                         logs.insert(json.query.location, TypeVec::Room(RoomAllocation {
@@ -180,6 +252,30 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                         }));
 
                         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+
+                        let subscriptions_locked = subscriptions.lock().await;
+
+                        match subscriptions_locked.get(&location) {
+                            Some(variance) => {
+                                println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
+                
+                                for client in variance {
+                                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
+                                        "update", 
+                                        serde_json::to_string(&RoomAllocation {
+                                            callee_candidates: "".to_string(),
+                                            caller_candidates: "".to_string(),
+                                            offer: "".to_string(),
+                                            id: uuid::Uuid::new_v4(),
+                                            pt: "room".to_string()
+                                        }).unwrap(),
+                                        location,
+                                        json.nonce
+                                    )).await;
+                                }
+                            }
+                            None => return,
+                        }
                     },
                     _ => {
                         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
@@ -188,29 +284,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
             }
         }
 
-        let subscriptions_locked = subscriptions.lock().await;
 
-        match subscriptions_locked.get(&location) {
-            Some(variance) => {
-                println!("Updating all NEEDED users for change to {}: {:?}", location, variance);
-
-                for client in variance {
-                    return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
-                        "update", 
-                        serde_json::to_string(&ChatMessage {
-                            content: json.query.message.to_string(),
-                            author: person.to_string(),
-                            session_author: client_id.to_string(),
-                            created_at: chrono::Utc::now(),
-                            id: uuid::Uuid::new_v4()
-                        }).unwrap(),
-                        location,
-                        json.nonce
-                    )).await;
-                }
-            }
-            None => return,
-        }
     }else if json.query.qtype == "init" {
         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"{}\", \"nonce\": \"{}\" }}", client_id.to_string(), json.nonce)).await;
     }else if json.query.qtype == "subscribe" {
@@ -261,16 +335,82 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                 }
             }
         }
-    }else if json.query.qtype.starts_with("room") {
-        // Note: No need to create a room, performing 'set' in a room that does not exist creates the room automatically. 
-        if json.query.qtype.ends_with("get") {
-            println!("received room");
-        }else if json.query.qtype.ends_with("delete") {
-            println!("removing room");
-        }
+    }else if json.query.qtype == "update" {
+        // Updating the [message] parameter in a location [location].
 
-        // Subscriptions follow the standard procedure as rooms are interchangeable with servers. 
+        let mut split = json.query.message.split(".");
+        let vec = split.collect::<Vec<&str>>();
+
+        match logs.get(&json.query.location) {
+            Some(v) => {
+                // If placement already exists...
+                match v {
+                    TypeVec::Chat(chat) => {
+                        // Chat not yet implemented.
+                        println!("Chat updates are not yet implemented. Try again later.")
+                    },
+                    TypeVec::Room(room) => {
+                        match vec[0] {
+                            "callee_candidates" => {
+                                println!("Changing Callee Candidate")
+                            },
+                            "caller_candidates" => {
+                                println!("Changing Caller Candidate")
+                            },
+                            "offer" => {
+                                println!("Changing Offer")
+
+                            },
+                            _ => {
+                                println!("Not sure how you got here... got: {:?}", vec[0]);
+                            }
+                        }
+
+                        println!("Update Parameter: {:?}", vec[1]);
+
+                        // let new_v = room.clone();
+
+                        // let json: HashMap<String, String> = match serde_json::from_str(&json.query.message) {
+                        //     Ok(v) => {
+                        //         println!("{:?}", v);
+
+                        //         logs.insert(json.query.location, TypeVec::Room(RoomAllocation {
+                        //             callee_candidates: "".to_string(),
+                        //             caller_candidates: "".to_string(),
+                        //             offer: "".to_string(),
+                        //             id: new_v.id,
+                        //             pt: "room".to_string()
+                        //         }));
+
+                        //         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
+
+                        //         v
+                        //     },
+                        //     Err(e) => {
+                        //         return return_to_sender(clients, client_id, format!("{{ \"message\": \"{}\", \"type\": \"error\" }}", e)).await;
+                        //     }
+                        // };
+                    }
+                }
+            },
+            None => {
+                return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"406\", \"nonce\": \"{}\" }}", json.nonce)).await;
+            }
+        }
     }
+
+
+
+    // else if json.query.qtype.starts_with("room") {
+    //     // Note: No need to create a room, performing 'set' in a room that does not exist creates the room automatically. 
+    //     if json.query.qtype.ends_with("get") {
+    //         println!("received room");
+    //     }else if json.query.qtype.ends_with("delete") {
+    //         println!("removing room");
+    //     }
+
+    //     // Subscriptions follow the standard procedure as rooms are interchangeable with servers. 
+    // }
 }
 
 async fn return_to_sender(clients: &Clients, client_id: &str, message: String) {

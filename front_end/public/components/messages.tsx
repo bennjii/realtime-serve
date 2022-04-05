@@ -5,6 +5,7 @@ import config from '../config'
 import { RTQueryHandler, Query, subscriptions } from '../query';
 import { Message, QueryResponse } from '../@types';
 import { useStateRef } from '../query/custom_state';
+import useHangClient from '../query/hangwith';
 
 export const isBrowser = typeof window !== "undefined";
 
@@ -14,22 +15,25 @@ export default function Messages() {
     const [ feed, setFeed ] = useState("1");
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
+    // const { client, createRoom } = useHangClient(ws);
+
     const [ subd, setSubd ] = useState(false);
     const input_ref = useRef<HTMLInputElement>();
 
     useEffect(() => {
         ws.init().then(e => {
-            const query =
-                new Query(ws).in(feed).subscribe("all", (payload: { message: string; nonce: string; type: string; }) => {
-                    console.log("Received response, setting sub vector addition!");
-                    setSubd(true);
-                    fetchNew();
+            new Query(ws).in(feed).subscribe("all", (payload: { message: string; nonce: string; type: string; }) => {
+                console.log("Received response, setting sub vector addition!");
+                setSubd(true);
+                fetchNew();
 
-                    subscriptions.push({ ...payload, location: feed, call: (e: any) => {
-                        console.log('Received message', e, 'n', messagesRef);
-                        insertMessage(e);
-                    } });
-                });
+                subscriptions.push({ ...payload, location: feed, call: (e: any) => {
+                    console.log('Received message', e, 'n', messagesRef);
+                    insertMessage(e);
+                } });
+            });
+
+            // createRoom("155123na91");
 
             window.onclose = () => {
                 subscriptions.map(e => new Query(ws).in(e.location).unsubscribe("all", () => {}))

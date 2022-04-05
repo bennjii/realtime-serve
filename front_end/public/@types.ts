@@ -2,7 +2,7 @@ import { Query } from "./query"
 
 type Request = {
     query: {
-        qtype: "get" | "set" | "init" | "subscribe" | "unsubscribe", 
+        qtype: "get" | "set" | "set.room" | "init" | "update" | "subscribe" | "unsubscribe", 
         message: string,
         location: string,
         limiter?: {
