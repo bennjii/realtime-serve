@@ -52,7 +52,7 @@ export default function Messages() {
 
     const insertMessage = (e: { content: any; }) => {
         console.log(messagesRef);
-        setMessages([ ...messagesRef.current, { Chat: e.content.messages }])
+        setMessages([ ...messagesRef.current, e.content])
     }
 
     const fetchNew = (_feed?: string) => {
