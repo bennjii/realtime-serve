@@ -15,7 +15,7 @@ export default function Messages() {
     const [ feed, setFeed ] = useState("1");
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
-    // const { client, createRoom } = useHangClient(ws);
+    const { client, createRoom } = useHangClient(ws);
 
     const [ subd, setSubd ] = useState(false);
     const input_ref = useRef<HTMLInputElement>();
@@ -33,7 +33,7 @@ export default function Messages() {
                 } });
             });
 
-            // createRoom("155123na91");
+            createRoom("155123na91");
 
             window.onclose = () => {
                 subscriptions.map(e => new Query(ws).in(e.location).unsubscribe("all", () => {}))
