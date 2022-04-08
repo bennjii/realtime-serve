@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { useEffect, useState } from "react";
-import { Query, RTQueryHandler } from ".";
+import { Query, RTQueryHandler, subscriptions } from ".";
 import { Response } from "../@types";
 
 export type HangClient = {
@@ -195,33 +195,17 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
         // For adding video sharing, simply gather the stream, and add the individual tracks.
 
         // Collect ICE candidates
+        const candidates = [];
+
         client.peerConnection.addEventListener('icecandidate', async event => {
             if(!event.candidate) return;  
+            candidates.push(event.candidate?.toJSON());
+        }); 
 
-            const data = await new Query(ws).in(room_id).get("all");
-            console.log("Recieved", data);
-
-            // await new Query(ws).in(room_id).update("caller_candidates.Hey");
-            
-            // TODO:IMPLEMENT
-            // supabase_client
-            //     .from('rooms')
-            //     .select()
-            //     .match({ room_id: room_id })
-            //     .then(e => {
-            //         const data = e.data?.[0];
-
-            //         if(data) {
-            //             const new_callers = data.caller_candidates
-            //                   new_callers.push(event.candidate?.toJSON());
-
-            //             supabase_client
-            //                 .from('rooms')
-            //                 .update({ caller_candidates: new_callers })
-            //                 .match({ room_id: room_id })
-            //                 .then(e => e.error && console.error("Supabase Client update threw error when adding ice-candidate: ", e))
-            //         }
-            //     })
+        client.peerConnection.addEventListener("icegatheringstatechange", async (e) => {
+            if(client.peerConnection.iceGatheringState == "complete") {
+                await new Query(ws).in(room_id).update("caller_candidates", JSON.stringify(candidates));
+            }
         });
 
         // Create a room
@@ -239,22 +223,8 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             type: offer.type,
             sdp: offer.sdp
         }));
-
-        // IMPLEMENTED.ABOVE
-        // await supabase_client
-        //     .from('rooms')
-        //     .update({
-        //         offer: {
-        //             type: offer.type,
-        //             sdp: offer.sdp
-        //         },
-        //     })
-        //     .match({ room_id: room_id })
-        //     .then(e => { 
-        //         return e.data?.[0].room_id;
-        //     });
                 
-        // client.room_id = roomId;
+        client.room_id = room_id;
         setClient({ ...client, room_id: room_id, connected: true });
 
         client.peerConnection.addEventListener('track', event => {
@@ -264,30 +234,10 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             });
         });
 
-        // TODO:IMPLEMENT
-        // supabase_client
-        //     .from(`rooms:room_id=eq.${room_id}`)
-        //     .on("*", async payload => {
-        //         const data = payload.new;
-
-        //         if(payload.eventType == "DELETE") { hangUp(); return; } 
-
-        //         if(!client.peerConnection.currentRemoteDescription && data && data.answer) {
-        //             const rtcSessionDescription = new RTCSessionDescription(data.answer);
-        //             await client.peerConnection.setRemoteDescription(rtcSessionDescription);
-        //         }
-
-        //         if(payload.old?.callee_candidates !== payload.new?.callee_candidates) {
-        //             data.callee_candidates.forEach((candidate: RTCIceCandidateInit) => {
-        //                 client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        //             });
-        //         }
-        //     }).subscribe()
-
         await new Query(ws).in(room_id).subscribe("all", async (payload: { response: Response, ref: Query }) => {
             console.log(payload.response);
 
-            // Implement Delete Handling...
+            // TODO: Implement Delete Handling...
             // if(payload.response.type == "delete") {}
             const data = payload.response.content.Room;
             const answer = JSON.parse(data.answer) as RTCSessionDescription;
@@ -319,30 +269,19 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
                 client.peerConnection.addTrack(track, client.localStream);
             });
 
-            client.peerConnection.addEventListener('icecandidate', event => {
-                if (!event.candidate) return;
+            const candidates = [];
 
-                // Maybe quite expensive task given 4 way ping.
-                // TODO:IMPLEMENT
-                // supabase_client
-                //     .from('rooms')
-                //     .select()
-                //     .match({ room_id: room_id })
-                //     .then(e => {
-                //         const data = e.data?.[0];
+            client.peerConnection.addEventListener('icecandidate', async event => {
+                if(!event.candidate) return;  
 
-                //         if(data) {
-                //             const new_callees = data.callee_candidates
-                //                   new_callees.push(event.candidate?.toJSON());
-
-                //             supabase_client
-                //                 .from('rooms')
-                //                 .update({ callee_candidates: new_callees })
-                //                 .match({ room_id: room_id })
-                //                 .then(e => e.error && console.error("Supabase Client update threw error when adding ice-candidate: ", e))
-                //         }
-                //     })
+                candidates.push(event.candidate?.toJSON());
             }); 
+
+            client.peerConnection.addEventListener("icegatheringstatechange", async (e) => {
+                if(client.peerConnection.iceGatheringState == "complete") {
+                    await new Query(ws).in(room_id).update("callee_candidates", JSON.stringify(candidates));
+                }
+            });
 
             client.peerConnection.addEventListener('track', event => {
                 event.streams[0].getTracks().forEach(track => {
@@ -356,16 +295,10 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             const answer = await client.peerConnection.createAnswer();
             await client.peerConnection.setLocalDescription(answer);
 
-            // TODO: Implement
-            // await supabase_client
-            //     .from('rooms')
-            //     .update({ 
-            //         answer: {
-            //             type: answer.type,
-            //             sdp: answer.sdp,
-            //         },
-            //     })
-            //     .match({ room_id: room_id })
+            await new Query(ws).in(room_id).update("answer", JSON.stringify({
+                type: answer.type,
+                sdp: answer.sdp,
+            }));
 
             //     supabase_client
             //     .from(`rooms:room_id=eq.${room_id}`)
@@ -376,6 +309,9 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             //             client.peerConnection.addIceCandidate(new RTCIceCandidate(e))
             //         })
             //     }).subscribe()
+            await new Query(ws).in(room_id).subscribe("all", (payload) => {
+                console.log("Room update ;", payload);
+            })
         }else {
             console.error("No Room Found with ID", room_id);
             return;
@@ -383,23 +319,18 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
     }
 
     const hangUp = async () => {    
-        // TODO: Implement
-        // await supabase_client.getSubscriptions().forEach(subscription => subscription.unsubscribe());
+        const index = subscriptions.findIndex(e => e.location == client.room_id);
+        subscriptions.splice(index, 1);
 
-        // // client.localStream.getTracks().forEach(track => track.stop());
+        // client.localStream.getTracks().forEach(track => track.stop());
 
-        // if (client.remoteStream)   client.remoteStream.getTracks().forEach(track => track.stop());
-        // if (client.peerConnection) client.peerConnection.close();
-        // if (client.room_id) {
-        //     // await supabase_client.getSubscriptions().forEach(e => supabase_client.removeSubscription(e));
+        if (client.remoteStream)   client.remoteStream.getTracks().forEach(track => track.stop());
+        if (client.peerConnection) client.peerConnection.close();
 
         //     await supabase_client
         //         .from('rooms')
         //         .delete()
         //         .match({ room_id: client.room_id });
-        // }
-
-        // console.log(supabase_client);
 
         setClient({ ...client, connected: false, room_id: null, peerConnection: new RTCPeerConnection(client.config) });
         

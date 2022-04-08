@@ -200,8 +200,8 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                     },
                     "set.room" => {
                         logs.insert(json.query.location, TypeVec::Room(RoomAllocation {
-                            callee_candidates: "".to_string(),
-                            caller_candidates: "".to_string(),
+                            callee_candidates: "[]".to_string(),
+                            caller_candidates: "[]".to_string(),
                             offer: "".to_string(),
                             answer: "".to_string(),
                             id: uuid::Uuid::new_v4(),
@@ -220,8 +220,8 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                                     return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
                                         format!("update.{}", "all"), 
                                         serde_json::to_string(&RoomAllocation {
-                                            callee_candidates: "".to_string(),
-                                            caller_candidates: "".to_string(),
+                                            callee_candidates: "[]".to_string(),
+                                            caller_candidates: "[]".to_string(),
                                             offer: "".to_string(),
                                             answer: "".to_string(),
                                             id: uuid::Uuid::new_v4(),

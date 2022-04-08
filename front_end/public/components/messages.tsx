@@ -15,7 +15,7 @@ export default function Messages() {
     const [ feed, setFeed ] = useState("1");
     const [ws] = useState(() => isBrowser ? new RTQueryHandler() : null);
 
-    const { client, createRoom } = useHangClient(ws);
+    const { createRoom, joinRoom } = useHangClient(ws);
 
     const [ subd, setSubd ] = useState(false);
     const input_ref = useRef<HTMLInputElement>();
@@ -33,8 +33,6 @@ export default function Messages() {
                     insertMessage(e);
                 } });
             });
-
-            createRoom("155123na91");   
 
             window.onclose = () => {
                 subscriptions.map(e => new Query(ws).in(e.location).unsubscribe("all", () => {}))
@@ -140,6 +138,8 @@ export default function Messages() {
             <button onClick={() => fetchNew()}>Query New</button>
             <button onClick={subd ? () => unsubscribe() : () => subscribe()}>{!subd ? "Subscribe" : "Unsubscribe"}, Currently {subd ? "Subscribed" : "Unsubscribed"}</button>
             <button onClick={setFeedType}>Set Feed</button>
+            <button onClick={() => createRoom("155123na91")}>Create Room</button>
+            <button onClick={() => joinRoom("155123na91")}>Join Room</button>
 
             <div>
                 Current Feed: { feed }
