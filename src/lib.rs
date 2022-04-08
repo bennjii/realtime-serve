@@ -19,6 +19,7 @@ pub struct RoomAllocation {
     pub callee_candidates: String,
     pub caller_candidates: String,
     pub offer: String,
+    pub answer: String,
     pub id: uuid::Uuid,
     pub pt: String,
 }

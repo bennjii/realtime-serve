@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { useEffect, useState } from "react";
 import { Query, RTQueryHandler } from ".";
+import { Response } from "../@types";
 
 export type HangClient = {
     config: any,
@@ -180,19 +181,10 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
 
         registerPeerConnectionListeners();
 
-        // const room_id = 
-        //     await supabase_client
-        //         .from('rooms')
-        //         .insert({
-        //             room_id: rid
-        //         })
-        //         .then(e => { 
-        //             return e.data?.[0].room_id;
-        //         });
-
         const room_id = rid ? rid : randomUUID();
+        console.log("sending query (room)", room_id);
+
         await new Query(ws).in(room_id).set("room");
-        
         console.log(`Created Room ${room_id}`)
 
         client.localStream?.getTracks().forEach(track => {
@@ -209,7 +201,7 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             const data = await new Query(ws).in(room_id).get("all");
             console.log("Recieved", data);
 
-            await new Query(ws).in(room_id).update("caller_candidates.Hey");
+            // await new Query(ws).in(room_id).update("caller_candidates.Hey");
             
             // TODO:IMPLEMENT
             // supabase_client
@@ -238,12 +230,17 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
 
         // Create a new supabase room with 'roomWithOffer' value. Store the generated return room's id.
 
-        await new Query(ws).in(room_id).update("offer." + JSON.stringify({
+        console.log("sending query update (offer)", "offer." + JSON.stringify({
             type: offer.type,
             sdp: offer.sdp
         }));
 
-        // TODO:IMPLEMENT
+        await new Query(ws).in(room_id).update("offer", JSON.stringify({
+            type: offer.type,
+            sdp: offer.sdp
+        }));
+
+        // IMPLEMENTED.ABOVE
         // await supabase_client
         //     .from('rooms')
         //     .update({
@@ -286,21 +283,34 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
         //             });
         //         }
         //     }).subscribe()
+
+        await new Query(ws).in(room_id).subscribe("all", async (payload: { response: Response, ref: Query }) => {
+            console.log(payload.response);
+
+            // Implement Delete Handling...
+            // if(payload.response.type == "delete") {}
+            const data = payload.response.content.Room;
+            const answer = JSON.parse(data.answer) as RTCSessionDescription;
+
+            if(!client.peerConnection.currentRemoteDescription && data && answer) {
+                const rtcSessionDescription = new RTCSessionDescription(answer);
+                await client.peerConnection.setRemoteDescription(rtcSessionDescription);
+            }
+            
+            // TODO: Handle New vs Old
+            // if(data.callee_candidates !== payload.new?.callee_candidates) {
+            //     data.callee_candidates.forEach((candidate: RTCIceCandidateInit) => {
+            //         client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            //     });
+            // }
+        });
     }
 
     const joinRoom = async (room_id: any) => {  
-        // TODO:IMPLEMENT
-        const data = null;
-        // const data = await supabase_client
-        //     .from('rooms')
-        //     .select()
-        //     .match({ room_id: room_id })
-        //     .then(e => {
-        //         return e?.data?.[0];
-        //     });
+        const data = await new Query(ws).in(room_id).get("all")
 
         if(data) {
-            setClient({ ...client, peerConnection: new RTCPeerConnection(client.config), connected: true, room_id: data.room_id })
+            setClient({ ...client, peerConnection: new RTCPeerConnection(client.config), connected: true, room_id: data.response.location })
 
             registerPeerConnectionListeners();
 
@@ -341,7 +351,7 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
                 })
             });
 
-            await client.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            await client.peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(data.response.content.Room.offer) as RTCSessionDescriptionInit));
 
             const answer = await client.peerConnection.createAnswer();
             await client.peerConnection.setLocalDescription(answer);

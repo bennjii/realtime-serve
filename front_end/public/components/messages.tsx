@@ -25,6 +25,7 @@ export default function Messages() {
             new Query(ws).in(feed).subscribe("all", (payload: { message: string; nonce: string; type: string; }) => {
                 console.log("Received response, setting sub vector addition!");
                 setSubd(true);
+                // If not yet created, will return 404 as chat is created and decomposed dynamically.
                 fetchNew();
 
                 subscriptions.push({ ...payload, location: feed, call: (e: any) => {
@@ -33,7 +34,7 @@ export default function Messages() {
                 } });
             });
 
-            createRoom("155123na91");
+            createRoom("155123na91");   
 
             window.onclose = () => {
                 subscriptions.map(e => new Query(ws).in(e.location).unsubscribe("all", () => {}))

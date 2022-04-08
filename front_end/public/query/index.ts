@@ -162,9 +162,9 @@ class Query {
      * 
      * @param message Indicates the parameter being changed. format: [property].[new_value]
      */
-    update(message: string) {
+    update(property: string, value: string) {
         this.request.query.qtype = "update";
-        this.request.query.message = message;
+        this.request.query.message = `${property}&&${value}`;
 
         return this.sendOff();
     }
@@ -192,7 +192,9 @@ class Query {
                 console.log("Returned", e);
                 
                 r({ response: e, ref: this });
-                if(this.callback) this.callback({ response: e, ref: this });
+
+                if(this.callback) subscriptions.push({ ...e, location: this.request.query.location, call: this.callback });
+                // if(this.callback) this.callback({ response: e, ref: this });
             })
         })
     }
