@@ -48,7 +48,7 @@ export interface HangClientParent<S> {
     /**
      * `async`
      * Leaves the current WebRTC connection
-     * Removes all supabase and WebRTC conneections, removes remote stream connections, clears room if empty
+     * Removes all websocket and WebRTC connections, removes remote stream connections, clears room if empty
      * 
      * *Generating a Room ID*
      * It is recommended to use `crypto.randomUUID()` on a backend service, such as in Next.js GetServerProps
@@ -212,8 +212,7 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
         const offer = await client.peerConnection.createOffer();
         await client.peerConnection.setLocalDescription(offer);
 
-        // Create a new supabase room with 'roomWithOffer' value. Store the generated return room's id.
-
+        // Create a new room with 'roomWithOffer' value. Store the generated return room's id.
         console.log("sending query update (offer)", "offer." + JSON.stringify({
             type: offer.type,
             sdp: offer.sdp
@@ -241,18 +240,18 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             // if(payload.response.type == "delete") {}
             const data = payload.response.content.Room;
             const answer = JSON.parse(data.answer) as RTCSessionDescription;
+            const candidates = JSON.parse(data.callee_candidates);
 
             if(!client.peerConnection.currentRemoteDescription && data && answer) {
                 const rtcSessionDescription = new RTCSessionDescription(answer);
                 await client.peerConnection.setRemoteDescription(rtcSessionDescription);
             }
-            
-            // TODO: Handle New vs Old
-            // if(data.callee_candidates !== payload.new?.callee_candidates) {
-            //     data.callee_candidates.forEach((candidate: RTCIceCandidateInit) => {
-            //         client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            //     });
-            // }
+
+            if(payload.response.type.includes("callee_candidates")) {
+                candidates.forEach((candidate: RTCIceCandidateInit) => {
+                    client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                });
+            }
         });
     }
 
@@ -300,18 +299,20 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
                 sdp: answer.sdp,
             }));
 
-            //     supabase_client
-            //     .from(`rooms:room_id=eq.${room_id}`)
-            //     .on("*", async payload => {
-            //         if(payload.eventType == "DELETE") { hangUp(); return; }
-
-            //         payload.new.caller_candidates.forEach((e: RTCIceCandidateInit) => {
-            //             client.peerConnection.addIceCandidate(new RTCIceCandidate(e))
-            //         })
-            //     }).subscribe()
-            await new Query(ws).in(room_id).subscribe("all", (payload) => {
-                console.log("Room update ;", payload);
-            })
+            await new Query(ws).in(room_id).subscribe("all", async (payload: { response: Response, ref: Query }) => {
+                console.log(payload.response);
+    
+                // TODO: Implement Delete Handling...
+                // if(payload.response.type == "delete") { hangUp(); return; }
+                const data = payload.response.content.Room;
+                const candidates = JSON.parse(data.caller_candidates);
+    
+                if(payload.response.type.includes("caller_candidates")) {
+                    candidates.forEach((candidate: RTCIceCandidateInit) => {
+                        client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    });
+                }
+            });
         }else {
             console.error("No Room Found with ID", room_id);
             return;
@@ -322,7 +323,7 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
         const index = subscriptions.findIndex(e => e.location == client.room_id);
         subscriptions.splice(index, 1);
 
-        // client.localStream.getTracks().forEach(track => track.stop());
+        client.localStream.getTracks().forEach(track => track.stop());
 
         if (client.remoteStream)   client.remoteStream.getTracks().forEach(track => track.stop());
         if (client.peerConnection) client.peerConnection.close();

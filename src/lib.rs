@@ -87,6 +87,7 @@ impl Serialize for RoomAllocation {
         state.serialize_field("callee_candidates", &self.callee_candidates)?;
         state.serialize_field("caller_candidates", &self.caller_candidates)?;
         state.serialize_field("offer", &self.offer.to_string())?;
+        state.serialize_field("answer", &self.answer.to_string())?;
         state.end()
     }
 }

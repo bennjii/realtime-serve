@@ -347,7 +347,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                 
                                 for client in variance {
                                     return_to_sender(clients, client, format!("{{ \"type\": \"{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
-                                        format!("update.{}", "all"), 
+                                        format!("update.{}", vec[0]), 
                                         serde_json::to_string(&new_r).unwrap(),
                                         location,
                                         json.nonce
