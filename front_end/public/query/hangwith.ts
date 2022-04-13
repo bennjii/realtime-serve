@@ -234,7 +234,7 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
         });
 
         await new Query(ws).in(room_id).subscribe("all", async (payload: { response: Response, ref: Query }) => {
-            console.log(payload.response);
+            console.log("Received Subscription Interval", payload.response);
 
             // TODO: Implement Delete Handling...
             // if(payload.response.type == "delete") {}
@@ -243,11 +243,13 @@ export function useHangClient<HangClientProps>(ws: RTQueryHandler, configuration
             const candidates = JSON.parse(data.callee_candidates);
 
             if(!client.peerConnection.currentRemoteDescription && data && answer) {
+                console.log("1 COMPLETE");
                 const rtcSessionDescription = new RTCSessionDescription(answer);
                 await client.peerConnection.setRemoteDescription(rtcSessionDescription);
             }
 
             if(payload.response.type.includes("callee_candidates")) {
+                console.log("2 COMPLETE");
                 candidates.forEach((candidate: RTCIceCandidateInit) => {
                     client.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                 });

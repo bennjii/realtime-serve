@@ -50,6 +50,7 @@ class RTQueryHandler {
         const data_ = JSON.parse(ev.data);
         console.log("Incoming", data_);
 
+        console.log(subscriptions);
         if(data_.type == "update" && subscriptions) subscriptions.find((e) => e.location = data_.location).call(data_)
     }
 
