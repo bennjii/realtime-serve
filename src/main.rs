@@ -20,7 +20,7 @@ async fn main() {
     let chat_log: lib::ChatLog = Arc::new(Mutex::new(HashMap::new()));
     let subscriptions: lib::Subscribe = Arc::new(Mutex::new(HashMap::new()));
 
-    println!("[SERVICE] ws_handler::start");
+    println!("[SERVICE] ws_handler::starting");
 
     let ws_route = warp::path::end()
         .and(warp::ws())
@@ -30,7 +30,12 @@ async fn main() {
         .and_then(handlers::ws_handler);
 
     let routes = ws_route.with(warp::cors().allow_any_origin());
-    warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
+    warp::serve(routes)
+        .tls()
+        .cert_path("cert.pem")
+        .key_path("key.rsa")
+        .run(([0, 0, 0, 0], 8000)).await;
+
 }
 
 fn with_clients(clients: Clients) -> impl Filter<Extract = (Clients,), Error = Infallible> + Clone {
