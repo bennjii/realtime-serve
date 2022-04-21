@@ -71,7 +71,7 @@ impl Serialize for Chat {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Message", 3)?;
+        let mut state = serializer.serialize_struct("Message", 2)?;
         state.serialize_field("messages", &self.messages)?;
         state.serialize_field("name", &self.name)?;
         state.end()
@@ -83,7 +83,7 @@ impl Serialize for RoomAllocation {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Message", 3)?;
+        let mut state = serializer.serialize_struct("Message", 4)?;
         state.serialize_field("callee_candidates", &self.callee_candidates)?;
         state.serialize_field("caller_candidates", &self.caller_candidates)?;
         state.serialize_field("offer", &self.offer.to_string())?;

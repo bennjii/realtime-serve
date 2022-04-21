@@ -20,7 +20,7 @@ async fn main() {
     let chat_log: lib::ChatLog = Arc::new(Mutex::new(HashMap::new()));
     let subscriptions: lib::Subscribe = Arc::new(Mutex::new(HashMap::new()));
 
-    println!("[SERVICE] ws_handler::starting");
+    println!("[SERVICE] ws_handler::start");
 
     let ws_route = warp::path::end()
         .and(warp::ws())
