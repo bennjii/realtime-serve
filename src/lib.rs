@@ -10,7 +10,7 @@ pub type ChatLog = Arc<Mutex<HashMap<String, TypeVec>>>;
 #[derive(Clone, Serialize, Debug, Deserialize)]
 pub enum TypeVec {
     Chat(Chat),
-    Room(RoomAllocation)
+    Room(RoomAllocation),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -40,7 +40,7 @@ pub struct ChatMessage {
     pub session_author: String,
     #[serde(deserialize_with = "deserialize_from_str")]
     pub created_at: DateTime<Utc>,
-    pub id: uuid::Uuid
+    pub id: uuid::Uuid,
 }
 
 fn deserialize_from_str<'de, S, D>(deserializer: D) -> Result<S, D::Error>
@@ -98,19 +98,19 @@ pub type Subscribe = Arc<Mutex<HashMap<String, Vec<String>>>>;
 pub struct SetReceive {
     pub query: Query,
     pub bearer: Auth,
-    pub nonce: String
+    pub nonce: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Auth {
     pub auth_token: String,
-    pub auth_id: String
+    pub auth_id: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Limiter {
     pub ltype: String,
-    pub amount: u16
+    pub amount: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,5 +119,5 @@ pub struct Query  {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub location: String,
     pub limiter: Limiter,
-    pub message: String
+    pub message: String,
 }
