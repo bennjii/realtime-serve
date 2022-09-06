@@ -273,7 +273,7 @@ async fn client_msg(client_id: &str, msg: Message, clients: &Clients, chat_log: 
                         return_to_sender(clients, client_id, format!("{{ \"type\": \"reply\", \"message\": \"200\", \"nonce\": \"{}\" }}", json.nonce)).await;
 
                         notify_interested_parties(clients, subscriptions, &location, format!("{{ \"type\": \"update.{}\", \"content\": {}, \"location\": \"{}\", \"nonce\": \"{}\", \"message\": \"OK\" }}", 
-                            vec[0], 
+                            vec[0],
                             serde_json::to_string(&new_r).unwrap(),
                             location,
                             json.nonce
